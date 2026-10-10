@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Site Observation & NCR Tracker</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#f4f5f7;--card:#fff;--tx:#1b1f24;--mu:#6a737d;--bd:#e1e4e8;--pr:#0b5fff;--ok:#1a7f37;--wa:#b26a00;--er:#cf222e}
+:root:not([data-theme="light"]){}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14171a;--card:#1d2125;--tx:#e6e8ea;--mu:#9aa4ae;--bd:#2d333a;--pr:#5b9bff;--ok:#3fb950;--wa:#e3a008;--er:#f85149}}
+:root[data-theme="dark"]{--bg:#14171a;--card:#1d2125;--tx:#e6e8ea;--mu:#9aa4ae;--bd:#2d333a;--pr:#5b9bff;--ok:#3fb950;--wa:#e3a008;--er:#f85149}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:env(safe-area-inset-top,0px);background:var(--card);border-bottom:1px solid var(--bd);padding:10px 14px;display:flex;gap:8px;align-items:center;z-index:5;flex-wrap:wrap}
+header h1{font-size:16px;margin:0;flex:1;min-width:140px}
+nav{display:flex;gap:6px}
+button,.btn{font:inherit;border:1px solid var(--bd);background:var(--card);color:var(--tx);padding:7px 12px;border-radius:8px;cursor:pointer}
+button.p{background:var(--pr);border-color:var(--pr);color:#fff}
+button.ok{background:var(--ok);border-color:var(--ok);color:#fff}
+button.er{color:var(--er)}
+button.on{border-color:var(--pr);color:var(--pr);font-weight:600}
+main{max-width:760px;margin:0 auto;padding:14px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:12px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.mu{color:var(--mu);font-size:13px}
+.tag{font-size:12px;padding:2px 8px;border-radius:99px;border:1px solid var(--bd);white-space:nowrap}
+.NCR{color:var(--er);border-color:var(--er)}.OBS{color:var(--pr);border-color:var(--pr)}
+.s-raised{color:var(--wa)}.s-accepted{color:var(--pr)}.s-rectified{color:#8250df}.s-closed{color:var(--ok)}
+label{display:block;font-size:13px;color:var(--mu);margin:10px 0 4px}
+input,select,textarea{width:100%;font:inherit;padding:8px;border-radius:8px;border:1px solid var(--bd);background:var(--bg);color:var(--tx)}
+textarea{min-height:76px}
+img.ph{max-width:100%;border-radius:10px;margin-top:8px;border:1px solid var(--bd)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin:10px 0}
+.stat{background:var(--bg);border-radius:10px;padding:10px;text-align:center}
+.stat b{display:block;font-size:22px}
+.tl{margin:8px 0 0;padding:0;list-style:none;border-left:2px solid var(--bd);margin-left:6px}
+.tl li{position:relative;padding:0 0 14px 16px}
+.tl li:before{content:"";position:absolute;left:-7px;top:5px;width:12px;height:12px;border-radius:50%;background:var(--pr);border:2px solid var(--card)}
+.tl li.last:before{background:var(--ok)}
+.item{cursor:pointer}
+h2{font-size:15px;margin:0 0 6px}
+.av{width:38px;height:38px;border-radius:50%;background:var(--pr);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;flex:none}
+</style></head><body>
+<header><h1>🏗️ Observation & NCR Tracker</h1>
+<nav><button data-v="list">Register</button><button data-v="eng">Engineers</button><button class="p" data-v="new">+ Raise</button><button data-a="switch">Switch user</button></nav></header>
+<main id="app"><div class="card mu">Loading…</div></main>
+<script>
+const $=s=>document.querySelector(s),app=$('#app');
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+/* ====== CONFIG: paste your Supabase values (see README.md) ====== */
+const SUPA_URL='https://mjrpritmaywpbovbghjw.supabase.co/rest/v1/',SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qcnByaXRtYXl3cGJvdmJnaGp3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE2MjEyMTMsImV4cCI6MjEwNzE5NzIxM30.LXT4fB1RTl4uL09zsZCWqBZA4fFYnhIZe5aYeiSDapk';
+/* ================================================================ */
+let meId=localStorage.getItem('meId'),engs={},obs=[],photos={},loaded=false,view='list',sel=null,filter='all',draft={photo:null,lat:null,lng:null};
+async function api(m,p,b){const r=await fetch(SUPA_URL+'/rest/v1/'+p,{method:m,headers:{apikey:SUPA_KEY,Authorization:'Bearer '+SUPA_KEY,'Content-Type':'application/json',Prefer:'return=representation'},body:b?JSON.stringify(b):undefined});if(!r.ok)throw new Error(await r.text());return r.json()}
+async function load(){
+  try{const [e,o]=await Promise.all([api('GET','engineers?select=*'),api('GET','obs?select=id,type,code,title,descr,to_id,by_id,method,loc,lat,lng,status,created_at,timeline&order=created_at.desc')]);
+    engs={};e.forEach(x=>engs[x.id]=x);
+    obs=o.map(x=>({...x,_id:x.id,desc:x.descr,to:x.to_id,by:x.by_id,createdAt:Number(x.created_at)}));
+    const first=!loaded;loaded=true;
+    const typing=/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName||'');
+    if(first||(!typing&&!['new','setup'].includes(view)))render();
+  }catch(e){if(!loaded)app.innerHTML='<div class="card">Could not load data: '+esc(e.message)+'</div>'}
+}
+const STAT={raised:'Raised',accepted:'Accepted',rectified:'Rectified – awaiting approval',closed:'Closed'};
+const nm=id=>engs[id]?.name||'Unknown engineer';
+const fdt=t=>new Date(t).toLocaleString([], {dateStyle:'medium',timeStyle:'short'});
+const ini=n=>n.split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase();
+
+function init(){
+  if(!SUPA_URL||!SUPA_KEY){app.innerHTML='<div class="card"><b>Setup needed.</b> Open index.html and paste your Supabase URL and anon key into SUPA_URL / SUPA_KEY (see README.md).</div>';return}
+  load();setInterval(load,10000);
+}
+function render(){
+  if(!loaded)return;
+  document.querySelectorAll('nav [data-v]').forEach(b=>b.classList.toggle('on',b.dataset.v===view));
+  if(!engs[meId]&&view!=='setup'){view='setup'}
+  ({setup:rSetup,list:rList,new:rNew,detail:rDetail,eng:rEng,prof:rProf}[view]||rList)();
+}
+function rSetup(){
+  const ex=Object.entries(engs).map(([id,e])=>`<option value="${id}">${esc(e.name)} — ${esc(e.designation||'')}</option>`).join('');
+  app.innerHTML=(ex?`<div class="card"><h2>Already registered?</h2><select id="ex">${ex}</select><br><br><button data-a="pick">Continue as this engineer</button></div>`:'')+`<div class="card"><h2>Create your engineer profile</h2><div class="mu">Everyone on the project needs a profile so they can be tagged.</div>
+  <label>Full name</label><input id="n"><label>Designation</label><input id="d" placeholder="e.g. Site Engineer – Civil">
+  <label>Discipline / Package</label><input id="p" placeholder="e.g. Civil, MEP, QA/QC"><br><br>
+  <button class="p" data-a="saveprof">Save profile</button></div>`;
+}
+function counts(id){
+  const rec=obs.filter(o=>o.to===id),rai=obs.filter(o=>o.by===id);
+  return {recO:rec.filter(o=>o.type==='OBS').length,recN:rec.filter(o=>o.type==='NCR').length,
+    open:rec.filter(o=>o.status!=='closed').length,closed:rec.filter(o=>o.status==='closed').length,
+    raiO:rai.filter(o=>o.type==='OBS').length,raiN:rai.filter(o=>o.type==='NCR').length};
+}
+function card(o){
+  return `<div class="card item" data-a="open" data-id="${o._id}"><div class="row"><span class="tag ${o.type==='NCR'?'NCR':'OBS'}">${o.code}</span>
+  <span class="tag s-${o.status}">${STAT[o.status]}</span><span class="mu" style="margin-left:auto">${fdt(o.createdAt)}</span></div>
+  <h2 style="margin-top:8px">${esc(o.title)}</h2><div class="mu">📍 ${esc(o.loc||'—')} · ${esc(nm(o.by))} → ${esc(nm(o.to))}</div></div>`;
+}
+function rList(){
+  const f={all:()=>true,mine:o=>o.to===meId,raised:o=>o.by===meId,open:o=>o.status!=='closed',closed:o=>o.status==='closed',ncr:o=>o.type==='NCR'}[filter];
+  const L=obs.filter(f);
+  app.innerHTML=`<div class="row" style="margin-bottom:12px">${[['all','All'],['mine','Assigned to me'],['raised','Raised by me'],['open','Open'],['closed','Closed'],['ncr','NCR']].map(([k,t])=>`<button class="${filter===k?'on':''}" data-a="filter" data-id="${k}">${t}</button>`).join('')}</div>`
+   +(L.length?L.map(card).join(''):'<div class="card mu">No records yet. Tap “+ Raise” to log the first observation.</div>');
+}
+function rNew(){
+  const opts=Object.entries(engs).filter(([id])=>id!==meId).map(([id,e])=>`<option value="${id}">${esc(e.name)} — ${esc(e.designation||'')}</option>`).join('');
+  app.innerHTML=`<div class="card"><h2>Raise observation / NCR</h2>
+  <label>Type</label><select id="t"><option value="OBS">Observation</option><option value="NCR">NCR (Non-Conformance)</option></select>
+  <label>Title</label><input id="ti"><label>Description</label><textarea id="de"></textarea>
+  <label>Tag concerned engineer</label><select id="to"><option value="">— select —</option>${opts}</select>
+  <label>Rectification method</label><textarea id="me" placeholder="How should this be fixed?"></textarea>
+  <label>Location</label><input id="lo" placeholder="Block / level / grid, e.g. Tower A, L3, Grid C-4">
+  <div class="row" style="margin-top:6px"><button data-a="gps">📍 Capture GPS</button><span class="mu" id="gs">${draft.lat?draft.lat.toFixed(5)+', '+draft.lng.toFixed(5):'Not captured'}</span></div>
+  <label>Photo</label><input type="file" id="ph" accept="image/*" capture="environment">
+  <div id="pv">${draft.photo?`<img class="ph" src="${draft.photo}">`:''}</div><br>
+  <button class="p" data-a="submit">Raise</button></div>`;
+  $('#ph').onchange=async e=>{const f=e.target.files[0];if(!f)return;draft.photo=await shrink(f);$('#pv').innerHTML=`<img class="ph" src="${draft.photo}">`};
+}
+function shrink(f){return new Promise(r=>{const i=new Image;i.onload=()=>{const s=Math.min(1,800/Math.max(i.width,i.height)),c=document.createElement('canvas');c.width=i.width*s;c.height=i.height*s;c.getContext('2d').drawImage(i,0,0,c.width,c.height);r(c.toDataURL('image/jpeg',.6))};i.src=URL.createObjectURL(f)})}
+function rDetail(){
+  const o=obs.find(x=>x._id===sel);if(!o){view='list';return render()}
+  const isTo=o.to===meId,isBy=o.by===meId;let act='';
+  if(photos[o._id]===undefined){photos[o._id]='';api('GET','obs?id=eq.'+o._id+'&select=photo').then(r=>{photos[o._id]=r[0]?.photo||'';if(view==='detail'&&sel===o._id&&!/TEXTAREA/.test(document.activeElement?.tagName))render()}).catch(()=>{delete photos[o._id]})}
+  if(o.status==='raised'&&isTo)act=`<button class="p" data-a="accept">✔ Confirm & accept</button>`;
+  if(o.status==='accepted'&&isTo)act=`<label>Closure note (as per rectification method)</label><textarea id="note"></textarea><br><button class="p" data-a="rectify">Mark rectified</button>`;
+  if(o.status==='rectified'&&isBy)act=`<div class="row"><button class="ok" data-a="approve">✔ Approve & close</button><button class="er" data-a="back">Send back</button></div>`;
+  const tl=o.timeline||[];
+  app.innerHTML=`<button data-a="back2">← Back</button><div class="card" style="margin-top:10px">
+  <div class="row"><span class="tag ${o.type==='NCR'?'NCR':'OBS'}">${o.code}</span><span class="tag s-${o.status}">${STAT[o.status]}</span></div>
+  <h2 style="margin-top:8px">${esc(o.title)}</h2><div>${esc(o.desc)}</div>
+  <p class="mu">📍 ${esc(o.loc||'—')} ${o.lat?`· <a href="https://maps.google.com/?q=${o.lat},${o.lng}" target="_blank" rel="noopener">${o.lat.toFixed(5)}, ${o.lng.toFixed(5)}</a>`:''}</p>
+  <p><b>Raised by:</b> <a href="#" data-a="prof" data-id="${o.by}">${esc(nm(o.by))}</a><br><b>Assigned to:</b> <a href="#" data-a="prof" data-id="${o.to}">${esc(nm(o.to))}</a></p>
+  <p><b>Rectification method:</b><br>${esc(o.method||'—')}</p>${photos[o._id]?`<img class="ph" src="${photos[o._id]}">`:''}</div>
+  ${act?`<div class="card">${act}</div>`:''}
+  <div class="card"><h2>Timeline</h2><ul class="tl">${tl.map((t,i)=>`<li class="${o.status==='closed'&&i===tl.length-1?'last':''}"><div>${tlText(t,o)}</div><div class="mu">${fdt(t.ts)}${t.note?' · “'+esc(t.note)+'”':''}</div></li>`).join('')}</ul></div>`;
+}
+function tlText(t,o){const by=esc(nm(t.by)),to=esc(nm(o.to)),r=esc(nm(o.by));const w=o.type==='NCR'?'an NCR':'an observation';
+  return {raise:`<b>${by}</b> raised ${w} to <b>${to}</b>`,accept:`<b>${by}</b> confirmed and accepted the ${o.type==='NCR'?'NCR':'observation'}`,
+  rectify:`<b>${by}</b> completed the work as per the rectification method`,approve:`<b>${by}</b> approved the rectification — ${o.type==='NCR'?'NCR':'observation'} closed`,
+  back:`<b>${by}</b> sent it back for re-work`}[t.k]||''}
+function rEng(){
+  app.innerHTML=Object.entries(engs).map(([id,e])=>{const c=counts(id);return `<div class="card item" data-a="prof" data-id="${id}"><div class="row"><div class="av">${esc(ini(e.name))}</div>
+  <div><b>${esc(e.name)}</b>${id===meId?' <span class="tag">you</span>':''}<div class="mu">${esc(e.designation||'')} · ${esc(e.discipline||'')}</div></div></div>
+  <div class="mu" style="margin-top:6px">Obs received: ${c.recO} · NCR received: ${c.recN} · Open: ${c.open}</div></div>`}).join('')||'<div class="card mu">No engineers yet.</div>';
+}
+function rProf(){
+  const id=sel,e=engs[id];if(!e){view='eng';return render()}const c=counts(id);
+  app.innerHTML=`<button data-a="back3">← Engineers</button><div class="card" style="margin-top:10px"><div class="row"><div class="av">${esc(ini(e.name))}</div>
+  <div><h2 style="margin:0">${esc(e.name)}</h2><div class="mu">${esc(e.designation||'')} · ${esc(e.discipline||'')}</div></div></div>
+  <div class="stats"><div class="stat"><b>${c.recO}</b>Observations received</div><div class="stat"><b>${c.recN}</b>NCRs received</div>
+  <div class="stat"><b>${c.open}</b>Open</div><div class="stat"><b>${c.closed}</b>Closed</div>
+  <div class="stat"><b>${c.raiO}</b>Observations raised</div><div class="stat"><b>${c.raiN}</b>NCRs raised</div></div></div>
+  <h2>Received by ${esc(e.name)}</h2>${obs.filter(o=>o.to===id).map(card).join('')||'<div class="card mu">None.</div>'}`;
+}
+async function upd(o,status,k,note){
+  const tl=[...(o.timeline||[]),{k,by:meId,ts:Date.now(),...(note?{note}:{})}];
+  try{await api('PATCH','obs?id=eq.'+o._id,{status,timeline:tl});await load()}catch(e){alert('Update failed: '+e.message)}
+}
+document.addEventListener('click',async ev=>{
+  const v=ev.target.closest('[data-v]');if(v){view=v.dataset.v;if(view==='new')draft={photo:null,lat:null,lng:null};return render()}
+  const b=ev.target.closest('[data-a]');if(!b)return;ev.preventDefault();
+  const a=b.dataset.a,id=b.dataset.id,o=obs.find(x=>x._id===sel);
+  if(a==='filter'){filter=id;render()}
+  else if(a==='open'){sel=id;view='detail';render()}
+  else if(a==='prof'){sel=id;view='prof';render()}
+  else if(a==='back2'){view='list';render()}
+  else if(a==='back3'){view='eng';render()}
+  else if(a==='saveprof'){const n=$('#n').value.trim();if(!n)return alert('Enter your name');
+    try{const r=await api('POST','engineers',{name:n,designation:$('#d').value.trim(),discipline:$('#p').value.trim()});meId=r[0].id;localStorage.setItem('meId',meId);await load();view='list'}catch(e){return alert('Save failed: '+e.message)}}
+  else if(a==='pick'){meId=$('#ex').value;localStorage.setItem('meId',meId);view='list'}
+  else if(a==='switch'){meId=null;localStorage.removeItem('meId');view='setup'}
+  else if(a==='gps'){$('#gs').textContent='Locating…';navigator.geolocation?.getCurrentPosition(p=>{draft.lat=p.coords.latitude;draft.lng=p.coords.longitude;$('#gs').textContent=draft.lat.toFixed(5)+', '+draft.lng.toFixed(5)},()=>{$('#gs').textContent='GPS unavailable — type the location instead'},{enableHighAccuracy:true,timeout:10000})}
+  else if(a==='submit'){
+    const t=$('#t').value,ti=$('#ti').value.trim(),to=$('#to').value;
+    if(!ti||!to)return alert('Title and concerned engineer are required');
+    const ts=Date.now(),code=(t==='NCR'?'NCR-':'OBS-')+ts.toString(36).slice(-5).toUpperCase();
+    try{await api('POST','obs',{type:t,code,title:ti,descr:$('#de').value.trim(),to_id:to,by_id:meId,method:$('#me').value.trim(),loc:$('#lo').value.trim(),lat:draft.lat,lng:draft.lng,photo:draft.photo,status:'raised',created_at:ts,timeline:[{k:'raise',by:meId,ts}]});await load();view='list'}
+    catch(e){return alert('Save failed: '+e.message)}
+  }
+  else if(a==='accept')return upd(o,'accepted','accept');
+  else if(a==='rectify')return upd(o,'rectified','rectify',$('#note').value.trim());
+  else if(a==='approve')return upd(o,'closed','approve');
+  else if(a==='back')return upd(o,'accepted','back');
+  if(['saveprof','submit','pick','switch'].includes(a))render();
+});
+init();
+</script></body></html>
