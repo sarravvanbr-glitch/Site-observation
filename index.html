@@ -47,7 +47,7 @@ h2{font-size:15px;margin:0 0 6px}
 const $=s=>document.querySelector(s),app=$('#app');
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 /* ====== CONFIG: paste your Supabase values (see README.md) ====== */
-const SUPA_URL='https://mjrpritmaywpbovbghjw.supabase.co/rest/v1/',SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qcnByaXRtYXl3cGJvdmJnaGp3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE2MjEyMTMsImV4cCI6MjEwNzE5NzIxM30.LXT4fB1RTl4uL09zsZCWqBZA4fFYnhIZe5aYeiSDapk';
+const SUPA_URL='https://mjrpritmaywpbovbghjw.supabase.co',SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qcnByaXRtYXl3cGJvdmJnaGp3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE2MjEyMTMsImV4cCI6MjEwNzE5NzIxM30.LXT4fB1RTl4uL09zsZCWqBZA4fFYnhIZe5aYeiSDapk';
 /* ================================================================ */
 let meId=localStorage.getItem('meId'),engs={},obs=[],photos={},loaded=false,view='list',sel=null,filter='all',draft={photo:null,lat:null,lng:null};
 async function api(m,p,b){const r=await fetch(SUPA_URL+'/rest/v1/'+p,{method:m,headers:{apikey:SUPA_KEY,Authorization:'Bearer '+SUPA_KEY,'Content-Type':'application/json',Prefer:'return=representation'},body:b?JSON.stringify(b):undefined});if(!r.ok)throw new Error(await r.text());return r.json()}
